@@ -1,100 +1,44 @@
-# Lab M5.09 - Pipeline Optimization & Performance
+# Lab M5.09 - Pipeline Optimization
 
-**Cloud Engineering Bootcamp - Week 5, Day 5**  
-**Module:** Cloud Automation & CI/CD
+## Pipeline Performance Comparison
 
-## Start Here: Fork, Clone, and Submit
-You will complete this lab by working in **your own fork** of the lab repository and submitting a **Pull Request (PR)**.
-1. **Fork the lab repository** to your GitHub account.
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/<your-github-username>/ce-lab-pipeline-optimization.git
-   cd ce-lab-pipeline-optimization
-   ```
-3. **Follow all instructions below** and save your work in this repo (files, screenshots, and notes).
-4. **When finished, submit your work:**
-   - `git add` → `git commit` → `git push`
-   - Open a **Pull Request** from your fork back to the original lab repo
-   - Copy the **PR URL** and paste it into the **Lab Submission** field in the Student Portal
+| Metric | Baseline (Slow) | Optimized |
+|--------|-----------------|-----------|
+| Total Duration | 0 min 19 sec | 0 min 46 sec (first run, cold cache) |
+| `terraform init` | ~5 sec | ~5 sec (cache populated on this run; faster on subsequent runs) |
+| Job Structure | 1 sequential job | 3 parallel jobs (lint + validate in parallel, plan waits on both) |
+| Path Filtering | None (runs on all changes) | `terraform/**` only |
+| Version Testing | Single version (1.6.0) | Matrix (1.6.0, 1.7.0, 1.8.0) |
 
-## 📋 Lab Overview
+**Note:** The Optimized Pipeline's first run took longer in wall-clock time than the Baseline because each parallel job spins up its own GitHub Actions runner (setup overhead), and the dependency cache was empty on this first run. The real benefit of caching shows up on subsequent runs, where `terraform init` skips provider downloads entirely on a cache hit. The structural benefit (parallel lint/validate instead of sequential) and the path filter (skipping runs for non-Terraform changes) provide consistent savings regardless of cache state.
 
-Optimize CI/CD pipeline performance through caching, parallelization, and efficient resource usage to reduce build times and costs.
+## Matrix Testing Results
 
-## 🎯 Learning Objectives
+| Terraform Version | Result | Notes |
+|--------------------|--------|-------|
+| 1.6.0 | ❌ Failed | `openpgp: key expired` — HashiCorp provider signing key issue affecting older pinned CLI versions |
+| 1.7.0 | ✅ Passed | |
+| 1.8.0 | ✅ Passed | |
 
-- Implement caching strategies for dependencies
-- Configure parallel job execution
-- Optimize Docker image builds
-- Reduce workflow execution time
-- Implement efficient artifact management
+This result demonstrates the risk of the "single Terraform version only" anti-pattern from the baseline: pinning CI to one fixed, aging version leaves the pipeline exposed to upstream issues (like an expired signing key) that newer versions have already resolved.
 
-## 📁 Repository Structure
+## Optimizations Applied
 
+1. **Dependency Caching** — `actions/cache@v4` stores `.terraform/` providers
+2. **Job Parallelization** — lint and validate run simultaneously
+3. **Path Filters** — skip pipeline for non-Terraform changes
+4. **Matrix Testing** — validate across multiple Terraform versions
+
+## Repository Structure
 ```
-ce-lab-pipeline-optimization/
-├── .github/
-│   └── workflows/
-│       ├── optimized-ci.yml
-│       └── benchmarks.yml
-├── .dockerignore
-├── Dockerfile
-├── README.md
-└── .gitignore
+├── .github/workflows/
+│   ├── baseline-slow.yml.disabled
+│   ├── optimized.yml
+│   └── matrix-test.yml
+├── terraform/
+│   ├── main.tf
+│   ├── variables.tf
+│   └── outputs.tf
+├── .gitignore
+└── README.md
 ```
-
-## Submission
-
-Complete the lab as described in the instructions and save your work in this repo (files, screenshots, and notes):
-
-1. **Caching Implementation**
-   - Dependency caching
-   - Docker layer caching
-   - Terraform state caching
-
-2. **Parallel Execution**
-   - Matrix builds
-   - Concurrent jobs
-   - Job dependencies optimization
-
-3. **Performance Metrics**
-   - Before/after benchmarks
-   - Build time improvements
-   - Cost optimization analysis
-
-4. **Documentation**
-   - Optimization strategies
-   - Performance comparisons
-   - Best practices
-
-**Reminder:** After pushing your work and opening a PR:
-- Copy the **PR URL**
-- Paste it into the **Lab Submission** field in the Student Portal
-
-## 🎓 Grading Rubric
-
-| Criteria | Points |
-|----------|--------|
-| **Caching Strategy** | 30 |
-| **Parallel Execution** | 30 |
-| **Performance Improvement** | 25 |
-| **Documentation** | 15 |
-| **Total** | 100 |
-
-## 💡 Tips
-
-- Measure baseline performance first
-- Cache dependencies aggressively
-- Use smaller Docker base images
-- Parallelize independent jobs
-- Monitor GitHub Actions minutes usage
-
-## 📚 Resources
-
-- [GitHub Actions Caching](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows)
-- [Docker Build Optimization](https://docs.docker.com/build/cache/)
-- [GitHub Actions Best Practices](https://docs.github.com/en/actions/learn-github-actions/best-practices-for-github-actions)
-
-<!-- ## 🚀 Submission
-
-Submit your repository URL through the course platform. -->
